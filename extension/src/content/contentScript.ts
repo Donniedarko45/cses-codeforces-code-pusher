@@ -1,6 +1,6 @@
 import { platformAdapters } from "../platforms";
 
-const detectAndSend = (): void => {
+const detectAndSend = async (): Promise<void> => {
   const html = document.documentElement.outerHTML;
   const adapter = platformAdapters.find((candidate) =>
     candidate.detectAccepted({ url: location.href, html }),
@@ -10,16 +10,21 @@ const detectAndSend = (): void => {
     return;
   }
 
-  const metadata = adapter.extractMetadata(document, location.href);
-  const sourceCode = adapter.extractCode(document);
+  const metadata = await adapter.extractMetadata(document, location.href);
+  const sourceCode = await adapter.extractCode(document, location.href);
 
   if (!metadata || !sourceCode) {
     return;
   }
 
+  let readmeContent: string | undefined;
+  if (adapter.fetchProblemStatement) {
+    readmeContent = await adapter.fetchProblemStatement(metadata.problemUrl);
+  }
+
   chrome.runtime.sendMessage({
     type: "NEW_ACCEPTED_SUBMISSION",
-    payload: { metadata, sourceCode },
+    payload: { metadata, sourceCode, readmeContent },
   });
 };
 

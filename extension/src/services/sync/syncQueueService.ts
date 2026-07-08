@@ -2,25 +2,28 @@ import { SecureStorage } from '../../storage/secureStorage'
 import type { SubmissionMetadata, SyncItem } from '../../types'
 
 export class SyncQueueService {
-  static async enqueue(metadata: SubmissionMetadata, sourceCode: string): Promise<boolean> {
-    const [queue, history] = await Promise.all([
-      SecureStorage.getSyncQueue(),
-      SecureStorage.getSyncHistory(),
-    ])
-    const duplicate = [...queue, ...history].some(
-      (item) =>
-        item.metadata.submissionId === metadata.submissionId ||
-        item.metadata.problemId === metadata.problemId ||
-        item.metadata.filename === metadata.filename,
-    )
+  static async enqueue(
+    metadata: SubmissionMetadata,
+    sourceCode: string,
+    readmeContent?: string,
+  ): Promise<boolean> {
+    const queue = await SecureStorage.getSyncQueue()
 
-    if (duplicate) {
+    // 1. Check if we already have this specific submission in the queue
+    const alreadyQueued = queue.some((item) => item.metadata.submissionId === metadata.submissionId)
+
+    // 2. Check if it's already in the uploaded history
+    const history = await SecureStorage.getSyncHistory()
+    const alreadyUploaded = history.some((item) => item.metadata.submissionId === metadata.submissionId)
+
+    if (alreadyQueued || alreadyUploaded) {
       return false
     }
 
     queue.push({
       metadata,
       sourceCode,
+      readmeContent,
       status: 'pending',
     })
 

@@ -15,12 +15,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "NEW_ACCEPTED_SUBMISSION") {
-    const { metadata, sourceCode } = message.payload as {
+    const { metadata, sourceCode, readmeContent } = message.payload as {
       metadata: SubmissionMetadata;
       sourceCode: string;
+      readmeContent?: string;
     };
 
-    void SyncQueueService.enqueue(metadata, sourceCode).then((enqueued) => {
+    void SyncQueueService.enqueue(metadata, sourceCode, readmeContent).then((enqueued) => {
       sendResponse({ enqueued });
       if (enqueued) {
         void processPendingSync();

@@ -73,8 +73,8 @@ export const csesAdapter: PlatformAdapter = {
     else if (langLower.includes('javascript')) extension = 'js'
 
     const problemUrl =
-      document.querySelector('a[href*="/problemset/task/"]')?.getAttribute('href') ??
-      document.querySelector('a[href*="/task/"]')?.getAttribute('href') ??
+      document.querySelector<HTMLAnchorElement>('a[href*="/problemset/task/"]')?.href ??
+      document.querySelector<HTMLAnchorElement>('a[href*="/task/"]')?.href ??
       url
 
     // Try to detect the CSES section from breadcrumbs or navigation
@@ -101,7 +101,47 @@ export const csesAdapter: PlatformAdapter = {
       tags: [],
       problemUrl,
       filename: `${sanitizeFilename(problemName)}.${extension}`,
-      folderPath,
+      folderPath: folderPath === 'CSES' ? folderPath : `${folderPath}/${sanitizeFilename(problemName)}`,
+    }
+  },
+
+  async fetchProblemStatement(url: string): Promise<string> {
+    try {
+      // Ensure the URL is absolute (handles older queued items that had relative URLs)
+      let absoluteUrl = url
+      if (url.startsWith('/')) {
+        absoluteUrl = `https://cses.fi${url}`
+      }
+
+      // For CSES, the problem URL is usually https://cses.fi/problemset/task/1068
+      const taskUrl = absoluteUrl.replace('/result/', '/task/').replace('/submission/', '/task/')
+      const resp = await fetch(taskUrl)
+      const html = await resp.text()
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(html, 'text/html')
+      
+      const contentNode = doc.querySelector('.content')
+      if (!contentNode) {
+        return `# Problem Statement\n\nCould not extract problem statement. Please view it at: ${taskUrl}`
+      }
+
+      // Remove unwanted script and style tags
+      const scripts = contentNode.querySelectorAll('script, style')
+      scripts.forEach(s => s.remove())
+
+      // We dynamically import turndown so it's only loaded when needed
+      const TurndownService = (await import('turndown')).default
+      const turndownService = new TurndownService({ headingStyle: 'atx' })
+      
+      let markdown = turndownService.turndown(contentNode.innerHTML)
+      
+      // Clean up multiple newlines
+      markdown = markdown.replace(/\n{3,}/g, '\n\n')
+      
+      return markdown
+    } catch (err) {
+      console.error('Failed to fetch problem statement:', err)
+      return `# Problem Statement\n\nFailed to fetch problem statement. URL: ${url}`
     }
   },
 }

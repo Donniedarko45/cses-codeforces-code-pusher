@@ -22,6 +22,7 @@ export interface SubmissionMetadata {
 export interface SyncItem {
   metadata: SubmissionMetadata
   sourceCode: string
+  readmeContent?: string
   status: SyncStatus
   error?: string
 }

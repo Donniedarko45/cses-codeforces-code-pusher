@@ -37,6 +37,14 @@ export const processPendingSync = async (): Promise<void> => {
   for (const item of queue) {
     const path = `${item.metadata.folderPath}/${item.metadata.filename}`
     try {
+      if (item.readmeContent) {
+        await github.upsertFile(
+          `${item.metadata.folderPath}/README.md`,
+          item.readmeContent,
+          `Add problem statement for ${item.metadata.problemName}`,
+        )
+      }
+
       await github.upsertFile(
         path,
         item.sourceCode,
