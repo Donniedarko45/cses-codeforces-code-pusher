@@ -6,6 +6,8 @@ import type {
 
 const STORAGE_KEYS = {
   token: 'github_token',
+  clientId: 'github_client_id',
+  githubUsername: 'github_username',
   settings: 'settings',
   repository: 'repository',
   syncHistory: 'sync_history',
@@ -22,6 +24,7 @@ const defaultSettings: ExtensionSettings = {
 }
 
 export class SecureStorage {
+  // --- Token ---
   static async setToken(token: string): Promise<void> {
     await chrome.storage.local.set({ [STORAGE_KEYS.token]: token })
   }
@@ -35,6 +38,35 @@ export class SecureStorage {
     await chrome.storage.local.remove(STORAGE_KEYS.token)
   }
 
+  // --- OAuth Client ID ---
+  static async setClientId(clientId: string): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.clientId]: clientId })
+  }
+
+  static async getClientId(): Promise<string | null> {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.clientId)
+    return (stored[STORAGE_KEYS.clientId] as string | undefined) ?? null
+  }
+
+  static async clearClientId(): Promise<void> {
+    await chrome.storage.local.remove(STORAGE_KEYS.clientId)
+  }
+
+  // --- GitHub Username ---
+  static async setGithubUsername(username: string): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.githubUsername]: username })
+  }
+
+  static async getGithubUsername(): Promise<string | null> {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.githubUsername)
+    return (stored[STORAGE_KEYS.githubUsername] as string | undefined) ?? null
+  }
+
+  static async clearGithubUsername(): Promise<void> {
+    await chrome.storage.local.remove(STORAGE_KEYS.githubUsername)
+  }
+
+  // --- Repository ---
   static async setRepository(config: RepositoryConfig): Promise<void> {
     await chrome.storage.local.set({ [STORAGE_KEYS.repository]: config })
   }
@@ -44,6 +76,11 @@ export class SecureStorage {
     return (stored[STORAGE_KEYS.repository] as RepositoryConfig | undefined) ?? null
   }
 
+  static async clearRepository(): Promise<void> {
+    await chrome.storage.local.remove(STORAGE_KEYS.repository)
+  }
+
+  // --- Settings ---
   static async getSettings(): Promise<ExtensionSettings> {
     const stored = await chrome.storage.local.get(STORAGE_KEYS.settings)
     return {
@@ -62,6 +99,7 @@ export class SecureStorage {
     })
   }
 
+  // --- Sync Queue ---
   static async getSyncQueue(): Promise<SyncItem[]> {
     const stored = await chrome.storage.local.get(STORAGE_KEYS.syncQueue)
     return (stored[STORAGE_KEYS.syncQueue] as SyncItem[] | undefined) ?? []
@@ -71,6 +109,7 @@ export class SecureStorage {
     await chrome.storage.local.set({ [STORAGE_KEYS.syncQueue]: items })
   }
 
+  // --- Sync History ---
   static async getSyncHistory(): Promise<SyncItem[]> {
     const stored = await chrome.storage.local.get(STORAGE_KEYS.syncHistory)
     return (stored[STORAGE_KEYS.syncHistory] as SyncItem[] | undefined) ?? []
