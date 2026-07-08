@@ -15,5 +15,5 @@ export interface PlatformAdapter {
     document: Document,
     url: string,
     fetchProblemStatementFn: (url: string) => Promise<string>
-  ) => Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[]>
+  ) => Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[] | null>
 }

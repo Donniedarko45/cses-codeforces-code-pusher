@@ -40,6 +40,7 @@ export class GitHubRepoService {
     path: string,
     content: string,
     commitMessage: string,
+    retryCount = 0,
   ): Promise<void> {
     const encoded = btoa(unescape(encodeURIComponent(content)))
 
@@ -67,6 +68,12 @@ export class GitHubRepoService {
         }),
       },
     )
+
+    if (response.status === 409 && retryCount < 3) {
+      // Branch has moved or file modified concurrently. Wait and retry with a fresh SHA query.
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      return this.upsertFile(path, content, commitMessage, retryCount + 1)
+    }
 
     if (!response.ok) {
       throw new Error(`GitHub upload failed for ${path}: ${response.status}`)

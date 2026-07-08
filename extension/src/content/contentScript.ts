@@ -17,16 +17,18 @@ const detectAndSend = async (): Promise<void> => {
         location.href,
         adapter.fetchProblemStatement ? adapter.fetchProblemStatement.bind(adapter) : async () => ""
       );
-      for (const item of items) {
-        chrome.runtime.sendMessage({
-          type: "NEW_ACCEPTED_SUBMISSION",
-          payload: item,
-        });
+      if (items !== null) {
+        for (const item of items) {
+          chrome.runtime.sendMessage({
+            type: "NEW_ACCEPTED_SUBMISSION",
+            payload: item,
+          });
+        }
+        return;
       }
     } catch (err) {
       console.error("Failed to extract multiple submissions:", err);
     }
-    return;
   }
 
   const metadata = await adapter.extractMetadata(document, location.href);

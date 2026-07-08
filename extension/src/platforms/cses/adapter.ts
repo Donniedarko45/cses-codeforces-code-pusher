@@ -281,7 +281,11 @@ export const csesAdapter: PlatformAdapter = {
     document: Document,
     _url: string,
     fetchProblemStatementFn: (url: string) => Promise<string>
-  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[]> {
+  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[] | null> {
+    if (_url.includes('/result/') || _url.includes('/submission/')) {
+      return null
+    }
+
     const acceptedLinks = Array.from(
       document.querySelectorAll<HTMLAnchorElement>('a[href*="/result/"], a[href*="/submission/"]')
     ).filter((a) => a.classList.contains('accepted') || a.querySelector('.accepted'))

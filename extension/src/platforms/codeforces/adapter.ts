@@ -300,9 +300,9 @@ export const codeforcesAdapter: PlatformAdapter = {
     document: Document,
     url: string,
     fetchProblemStatementFn: (url: string) => Promise<string>
-  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[]> {
+  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[] | null> {
     if (!url.includes('/status') && !url.includes('/my') && !url.includes('/submissions')) {
-      return []
+      return null
     }
 
     const acceptedRows = Array.from(document.querySelectorAll('tr[data-submission-id]')).filter((row) =>
