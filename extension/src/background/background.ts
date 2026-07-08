@@ -2,6 +2,7 @@ import { SyncQueueService } from "../services/sync/syncQueueService";
 import { GitHubAuthService } from "../services/github/githubAuthService";
 import type { SubmissionMetadata } from "../types";
 import { processPendingSync } from "./syncProcessor";
+import { SecureStorage } from "../storage/secureStorage";
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create("sync-pending-solutions", { periodInMinutes: 1 });
@@ -66,6 +67,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
     })();
 
+    return true;
+  }
+
+  if (message?.type === "CHECK_SUBMISSIONS_STATUS") {
+    const { submissionIds } = message.payload as { submissionIds: string[] };
+    void (async () => {
+      const queue = await SecureStorage.getSyncQueue();
+      const history = await SecureStorage.getSyncHistory();
+      const results = submissionIds.reduce((acc, subId) => {
+        const inQueue = queue.some((item) => item.metadata.submissionId === subId);
+        const inHistory = history.some((item) => item.metadata.submissionId === subId);
+        acc[subId] = inQueue || inHistory;
+        return acc;
+      }, {} as Record<string, boolean>);
+      sendResponse(results);
+    })();
     return true;
   }
 

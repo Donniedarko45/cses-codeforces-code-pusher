@@ -46,11 +46,11 @@ export const codeforcesAdapter: PlatformAdapter = {
 
       if (targetRow) {
         const subId = targetRow.getAttribute('data-submission-id')
-        const submissionLink = targetRow.querySelector<HTMLAnchorElement>('a.view-source') || targetRow.querySelector<HTMLAnchorElement>(`a[href*="/submission/${subId}"]`)
-        
-        if (submissionLink) {
+        if (subId) {
+          const contestId = url.match(/(?:contest|gym)\/(\d+)/)?.[1]
+          const submissionUrl = getSubmissionUrl(targetRow, subId, contestId)
           try {
-            const resp = await fetch(submissionLink.href)
+            const resp = await fetch(submissionUrl)
             const html = await resp.text()
             const parser = new DOMParser()
             const doc = parser.parseFromString(html, 'text/html')
@@ -278,4 +278,182 @@ export const codeforcesAdapter: PlatformAdapter = {
       return `# Problem Statement\n\nFailed to fetch problem statement. URL: ${url}`
     }
   },
+
+  async extractMultiple(
+    document: Document,
+    url: string,
+    fetchProblemStatementFn: (url: string) => Promise<string>
+  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[]> {
+    if (!url.includes('/status') && !url.includes('/my') && !url.includes('/submissions')) {
+      return []
+    }
+
+    const acceptedRows = Array.from(document.querySelectorAll('tr[data-submission-id]')).filter((row) =>
+      row.querySelector('span.verdict-accepted')
+    )
+
+    if (acceptedRows.length === 0) {
+      return []
+    }
+
+    const rowIds = acceptedRows
+      .map((row) => row.getAttribute('data-submission-id'))
+      .filter(Boolean) as string[]
+
+    const syncedStatus = await new Promise<Record<string, boolean>>((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'CHECK_SUBMISSIONS_STATUS',
+          payload: { submissionIds: rowIds },
+        },
+        (response) => {
+          resolve(response || {})
+        }
+      )
+    })
+
+    const unsyncedRows = acceptedRows.filter((row) => {
+      const subId = row.getAttribute('data-submission-id')
+      return subId && !syncedStatus[subId]
+    })
+
+    const problemCache: Record<string, string> = {}
+    const fetchWithCache = async (problemUrl: string): Promise<string> => {
+      if (problemCache[problemUrl]) {
+        return problemCache[problemUrl]
+      }
+      const readme = await fetchProblemStatementFn(problemUrl)
+      problemCache[problemUrl] = readme
+      return readme
+    }
+
+    const results = []
+    for (const row of unsyncedRows) {
+      try {
+        const item = await extractFromRow(row, url, fetchWithCache)
+        if (item) {
+          results.push(item)
+        }
+      } catch (err) {
+        console.error('Error extracting row:', err)
+      }
+    }
+
+    return results
+  },
+}
+
+const extractFromRow = async (
+  row: Element,
+  url: string,
+  fetchProblemStatementFn: (url: string) => Promise<string>
+): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string } | null> => {
+  const submissionId = row.getAttribute('data-submission-id')
+  if (!submissionId) return null
+
+  let contestId = url.match(/(?:contest|gym)\/(\d+)/)?.[1]
+  
+  const problemLink = row.querySelector<HTMLAnchorElement>('td a[href*="/problem/"]')
+  let problemId = 'unknown'
+  let problemName = 'Unknown Problem'
+  let problemUrl = url
+
+  if (problemLink) {
+    problemUrl = problemLink.href
+    if (!contestId) {
+      const cMatch = problemUrl.match(/\/(?:contest|problem|gym)\/(\d+)/)
+      if (cMatch) contestId = cMatch[1]
+    }
+
+    const linkText = problemLink.textContent?.trim() || ''
+    const match = linkText.match(/^([A-Z0-9]+)\s*-\s*(.+)$/)
+    if (match) {
+      problemId = match[1]
+      problemName = match[2]
+    } else {
+      problemName = linkText
+    }
+  }
+
+  const cells = row.querySelectorAll('td')
+  const language = cells[4]?.textContent?.trim() || 'Unknown'
+  const runtime = cells[6]?.textContent?.trim() || '0 ms'
+  const memory = cells[7]?.textContent?.trim() || '0 KB'
+
+  let extension = 'cpp'
+  const langLower = language.toLowerCase()
+  if (langLower.includes('python')) extension = 'py'
+  else if (langLower.includes('java') && !langLower.includes('javascript')) extension = 'java'
+  else if (langLower.includes('rust')) extension = 'rs'
+  else if (langLower.includes('kotlin')) extension = 'kt'
+  else if (langLower.includes('javascript')) extension = 'js'
+  else if (langLower.includes('go ') || langLower === 'go') extension = 'go'
+
+  const folderPath = contestId
+    ? `Codeforces/${contestId}/${sanitizeFilename(problemName)}`
+    : `Codeforces/${sanitizeFilename(problemName)}`
+
+  const metadata: SubmissionMetadata = {
+    submissionId,
+    platform: 'Codeforces',
+    problemId,
+    contestId,
+    problemName,
+    language,
+    submittedAt: new Date().toISOString(),
+    runtime,
+    memory,
+    tags: [],
+    problemUrl,
+    filename: `${sanitizeFilename(problemId)}_${sanitizeFilename(problemName)}.${extension}`,
+    folderPath,
+  }
+
+  let sourceCode: string | null = null
+  const submissionUrl = getSubmissionUrl(row, submissionId, contestId)
+  try {
+    const resp = await fetch(submissionUrl)
+    const html = await resp.text()
+    const parser = new DOMParser()
+    const subDoc = parser.parseFromString(html, 'text/html')
+    
+    const getCodeText = (document: Document | Element, selector: string): string => {
+      const el = document.querySelector(selector)
+      if (!el) return ''
+      return ((el as HTMLElement).innerText || el.textContent || '').trim()
+    }
+
+    sourceCode =
+      getCodeText(subDoc, 'pre#program-source-text') ||
+      getCodeText(subDoc, 'pre.program-source') ||
+      getCodeText(subDoc, '.source-code pre') ||
+      null
+  } catch (e) {
+    console.error('Failed to fetch code automatically:', e)
+  }
+
+  if (!sourceCode) return null
+
+  let readmeContent: string | undefined
+  try {
+    readmeContent = await fetchProblemStatementFn(problemUrl)
+  } catch (err) {
+    console.error('Failed to fetch problem statement:', err)
+  }
+
+  return { metadata, sourceCode, readmeContent }
+}
+
+const getSubmissionUrl = (row: Element, submissionId: string, contestId?: string): string => {
+  const links = Array.from(row.querySelectorAll('a'))
+  for (const link of links) {
+    const href = link.getAttribute('href') || ''
+    if (href && href !== '#' && !href.startsWith('javascript:') && href.includes(submissionId)) {
+      return link.href
+    }
+  }
+  if (contestId) {
+    return `https://codeforces.com/contest/${contestId}/submission/${submissionId}`
+  }
+  return `https://codeforces.com/submission/${submissionId}`
 }

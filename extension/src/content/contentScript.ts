@@ -10,6 +10,25 @@ const detectAndSend = async (): Promise<void> => {
     return;
   }
 
+  if (adapter.extractMultiple) {
+    try {
+      const items = await adapter.extractMultiple(
+        document,
+        location.href,
+        adapter.fetchProblemStatement ? adapter.fetchProblemStatement.bind(adapter) : async () => ""
+      );
+      for (const item of items) {
+        chrome.runtime.sendMessage({
+          type: "NEW_ACCEPTED_SUBMISSION",
+          payload: item,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to extract multiple submissions:", err);
+    }
+    return;
+  }
+
   const metadata = await adapter.extractMetadata(document, location.href);
   const sourceCode = await adapter.extractCode(document, location.href);
 
