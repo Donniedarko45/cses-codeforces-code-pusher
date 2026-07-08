@@ -188,13 +188,90 @@ export const codeforcesAdapter: PlatformAdapter = {
       const scripts = problemNode.querySelectorAll('script, style')
       scripts.forEach(s => s.remove())
 
-      // We dynamically import turndown so it's only loaded when needed
       const TurndownService = (await import('turndown')).default
       const turndownService = new TurndownService({ headingStyle: 'atx' })
-      let markdown = turndownService.turndown(problemNode.innerHTML)
+
+      // Extract metadata properties
+      const title = getText(problemNode, '.header .title')
+      const timeLimit = getText(problemNode, '.header .time-limit').replace('time limit per test', '').trim()
+      const memoryLimit = getText(problemNode, '.header .memory-limit').replace('memory limit per test', '').trim()
+      const inputFile = getText(problemNode, '.header .input-file').replace('input', '').trim()
+      const outputFile = getText(problemNode, '.header .output-file').replace('output', '').trim()
+
+      let markdown = `# ${title}\n\n`
+      markdown += `| Metric | Value |\n`
+      markdown += `| :--- | :--- |\n`
+      if (timeLimit) markdown += `| **Time Limit** | ${timeLimit} |\n`
+      if (memoryLimit) markdown += `| **Memory Limit** | ${memoryLimit} |\n`
+      if (inputFile) markdown += `| **Input File** | ${inputFile} |\n`
+      if (outputFile) markdown += `| **Output File** | ${outputFile} |\n`
+      markdown += `\n`
+
+      // 1. Description (Legend)
+      const legendNode = problemNode.querySelector('.legend')
+      if (legendNode) {
+        markdown += `## Description\n\n${turndownService.turndown(legendNode.innerHTML)}\n\n`
+      }
+
+      // 2. Input Spec
+      const inputSpecNode = problemNode.querySelector('.input-specification')
+      if (inputSpecNode) {
+        const titleEl = inputSpecNode.querySelector('.section-title')
+        if (titleEl) titleEl.remove()
+        markdown += `## Input\n\n${turndownService.turndown(inputSpecNode.innerHTML)}\n\n`
+      }
+
+      // 3. Output Spec
+      const outputSpecNode = problemNode.querySelector('.output-specification')
+      if (outputSpecNode) {
+        const titleEl = outputSpecNode.querySelector('.section-title')
+        if (titleEl) titleEl.remove()
+        markdown += `## Output\n\n${turndownService.turndown(outputSpecNode.innerHTML)}\n\n`
+      }
+
+      // 4. Sample Tests
+      const sampleTestsNode = problemNode.querySelector('.sample-tests')
+      if (sampleTestsNode) {
+        markdown += `## Examples\n\n`
+        const sampleTests = sampleTestsNode.querySelectorAll('.sample-test')
+        sampleTests.forEach((test, idx) => {
+          const prefix = sampleTests.length > 1 ? `### Example ${idx + 1}\n\n` : ''
+          markdown += prefix
+
+          const inputPre = test.querySelector('.input pre')
+          if (inputPre) {
+            const inputText = (inputPre.textContent || '').trim()
+            markdown += `**Input**\n\`\`\`text\n${inputText}\n\`\`\`\n\n`
+          }
+
+          const outputPre = test.querySelector('.output pre')
+          if (outputPre) {
+            const outputText = (outputPre.textContent || '').trim()
+            markdown += `**Output**\n\`\`\`text\n${outputText}\n\`\`\`\n\n`
+          }
+        })
+      }
+
+      // 5. Note
+      const noteNode = problemNode.querySelector('.note')
+      if (noteNode) {
+        const titleEl = noteNode.querySelector('.section-title')
+        if (titleEl) titleEl.remove()
+        markdown += `## Note\n\n${turndownService.turndown(noteNode.innerHTML)}\n\n`
+      }
+
+      // --- Beautify Math Formulas ---
+      // Replace Codeforces $$$ with standard LaTeX $
+      markdown = markdown.replace(/\$\$\$/g, '$')
       
+      // Fix escaped backslashes inside math blocks
+      markdown = markdown.replace(/\$([^$]+)\$/g, (_, p1) => {
+        return '$' + p1.replace(/\\\\/g, '\\') + '$'
+      })
+
       // Clean up multiple newlines
       markdown = markdown.replace(/\n{3,}/g, '\n\n')
+      
       return markdown
     } catch (err) {
       console.error('Failed to fetch problem statement:', err)
