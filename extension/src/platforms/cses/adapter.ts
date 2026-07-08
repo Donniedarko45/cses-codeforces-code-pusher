@@ -1,6 +1,7 @@
 import type { PlatformAdapter } from '../base'
 import { sanitizeFilename } from '../../utils/sanitize'
 import type { SubmissionMetadata } from '../../types'
+import { fetchText } from '../../utils/fetch'
 
 /**
  * CSES result pages use URLs like:
@@ -9,8 +10,8 @@ import type { SubmissionMetadata } from '../../types'
  * Older or alternate URLs may use "submission" instead of "result".
  */
 export const isCsesAccepted = (url: string, html: string): boolean =>
-  /cses\.fi\/.+(?:result|submission)/i.test(url) &&
-  /(ACCEPTED|Accepted|Your submission was accepted)/.test(html)
+  /cses\.fi\/.+(?:result|submission|task)/i.test(url) &&
+  (/(ACCEPTED|Accepted|Your submission was accepted)/.test(html) || html.includes('class="accepted"'))
 
 const getText = (document: Document, selector: string): string => {
   const el = document.querySelector(selector)
@@ -115,8 +116,7 @@ export const csesAdapter: PlatformAdapter = {
 
       // For CSES, the problem URL is usually https://cses.fi/problemset/task/1068
       const taskUrl = absoluteUrl.replace('/result/', '/task/').replace('/submission/', '/task/')
-      const resp = await fetch(taskUrl)
-      const html = await resp.text()
+      const html = await fetchText(taskUrl)
       const parser = new DOMParser()
       const doc = parser.parseFromString(html, 'text/html')
       
@@ -275,5 +275,70 @@ export const csesAdapter: PlatformAdapter = {
       console.error('Failed to fetch problem statement:', err)
       return `# Problem Statement\n\nFailed to fetch problem statement. URL: ${url}`
     }
+  },
+
+  async extractMultiple(
+    document: Document,
+    _url: string,
+    fetchProblemStatementFn: (url: string) => Promise<string>
+  ): Promise<{ metadata: SubmissionMetadata; sourceCode: string; readmeContent?: string }[]> {
+    const acceptedLinks = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('a[href*="/result/"], a[href*="/submission/"]')
+    ).filter((a) => a.classList.contains('accepted') || a.querySelector('.accepted'))
+
+    if (acceptedLinks.length === 0) {
+      return []
+    }
+
+    const submissionIds = acceptedLinks
+      .map((a) => a.getAttribute('href')?.match(/(?:result|submission)\/(\d+)/)?.[1])
+      .filter(Boolean) as string[]
+
+    const syncedStatus = await new Promise<Record<string, boolean>>((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          type: 'CHECK_SUBMISSIONS_STATUS',
+          payload: { submissionIds },
+        },
+        (response) => {
+          resolve(response || {})
+        }
+      )
+    })
+
+    const results = []
+    for (const link of acceptedLinks) {
+      const href = link.getAttribute('href') || ''
+      const subId = href.match(/(?:result|submission)\/(\d+)/)?.[1]
+      if (!subId || syncedStatus[subId]) continue
+
+      try {
+        let absoluteSubUrl = href
+        if (href.startsWith('/')) {
+          absoluteSubUrl = `https://cses.fi${href}`
+        }
+
+        const html = await fetchText(absoluteSubUrl)
+        const parser = new DOMParser()
+        const subDoc = parser.parseFromString(html, 'text/html')
+
+        const metadata = await csesAdapter.extractMetadata(subDoc, absoluteSubUrl)
+        const sourceCode = await csesAdapter.extractCode(subDoc, absoluteSubUrl)
+
+        if (metadata && sourceCode) {
+          let readmeContent: string | undefined
+          try {
+            readmeContent = await fetchProblemStatementFn(metadata.problemUrl)
+          } catch (e) {
+            console.error('Failed to fetch CSES problem statement:', e)
+          }
+          results.push({ metadata, sourceCode, readmeContent })
+        }
+      } catch (err) {
+        console.error(`Failed to extract CSES submission ${subId}:`, err)
+      }
+    }
+
+    return results
   },
 }

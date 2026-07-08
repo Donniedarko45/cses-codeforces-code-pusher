@@ -1,6 +1,7 @@
 import type { PlatformAdapter } from '../base'
 import { sanitizeFilename } from '../../utils/sanitize'
 import type { SubmissionMetadata } from '../../types'
+import { fetchText } from '../../utils/fetch'
 
 const acceptedSignals = ['Accepted', 'verdict-accepted']
 
@@ -50,8 +51,7 @@ export const codeforcesAdapter: PlatformAdapter = {
           const contestId = url.match(/(?:contest|gym)\/(\d+)/)?.[1]
           const submissionUrl = getSubmissionUrl(targetRow, subId, contestId)
           try {
-            const resp = await fetch(submissionUrl)
-            const html = await resp.text()
+            const html = await fetchText(submissionUrl)
             const parser = new DOMParser()
             const doc = parser.parseFromString(html, 'text/html')
             
@@ -155,6 +155,13 @@ export const codeforcesAdapter: PlatformAdapter = {
       ? `Codeforces/${contestId}/${sanitizeFilename(problemName)}`
       : `Codeforces/${sanitizeFilename(problemName)}`
 
+    const tagElements = document.querySelectorAll('.tag-box')
+    const tags = Array.from(tagElements)
+      .map((el) => el.textContent?.trim())
+      .filter(Boolean) as string[]
+    const difficulty = tags.find((t) => t.startsWith('*'))?.replace('*', '') || undefined
+    const cleanTags = tags.filter((t) => !t.startsWith('*'))
+
     return {
       submissionId: submissionId ?? 'unknown',
       platform: 'Codeforces',
@@ -165,7 +172,8 @@ export const codeforcesAdapter: PlatformAdapter = {
       submittedAt: new Date().toISOString(),
       runtime,
       memory,
-      tags: [],
+      tags: cleanTags,
+      difficulty,
       problemUrl,
       filename: `${sanitizeFilename(problemId)}_${sanitizeFilename(problemName)}.${extension}`,
       folderPath,
@@ -174,8 +182,7 @@ export const codeforcesAdapter: PlatformAdapter = {
 
   async fetchProblemStatement(url: string): Promise<string> {
     try {
-      const resp = await fetch(url)
-      const html = await resp.text()
+      const html = await fetchText(url)
       const parser = new DOMParser()
       const doc = parser.parseFromString(html, 'text/html')
       const problemNode = doc.querySelector('.problem-statement')
@@ -198,6 +205,14 @@ export const codeforcesAdapter: PlatformAdapter = {
       const inputFile = getText(problemNode, '.header .input-file').replace('input', '').trim()
       const outputFile = getText(problemNode, '.header .output-file').replace('output', '').trim()
 
+      // Extract tags & difficulty
+      const tagElements = doc.querySelectorAll('.tag-box')
+      const tags = Array.from(tagElements)
+        .map((el) => el.textContent?.trim())
+        .filter(Boolean) as string[]
+      const difficulty = tags.find((t) => t.startsWith('*'))?.replace('*', '') || ''
+      const cleanTags = tags.filter((t) => !t.startsWith('*'))
+
       let markdown = `# ${title}\n\n`
       markdown += `| Metric | Value |\n`
       markdown += `| :--- | :--- |\n`
@@ -205,6 +220,8 @@ export const codeforcesAdapter: PlatformAdapter = {
       if (memoryLimit) markdown += `| **Memory Limit** | ${memoryLimit} |\n`
       if (inputFile) markdown += `| **Input File** | ${inputFile} |\n`
       if (outputFile) markdown += `| **Output File** | ${outputFile} |\n`
+      if (difficulty) markdown += `| **Difficulty** | ${difficulty} |\n`
+      if (cleanTags.length > 0) markdown += `| **Tags** | ${cleanTags.join(', ')} |\n`
       markdown += `\n`
 
       // 1. Description (Legend)
@@ -412,8 +429,7 @@ const extractFromRow = async (
   let sourceCode: string | null = null
   const submissionUrl = getSubmissionUrl(row, submissionId, contestId)
   try {
-    const resp = await fetch(submissionUrl)
-    const html = await resp.text()
+    const html = await fetchText(submissionUrl)
     const parser = new DOMParser()
     const subDoc = parser.parseFromString(html, 'text/html')
     

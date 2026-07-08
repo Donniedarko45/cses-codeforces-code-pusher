@@ -58,4 +58,20 @@ export class SyncQueueService {
       ),
     )
   }
+
+  static async markRetry(submissionId: string, error: string): Promise<void> {
+    const queue = await SecureStorage.getSyncQueue()
+    await SecureStorage.setSyncQueue(
+      queue.map((item) =>
+        item.metadata.submissionId === submissionId
+          ? {
+              ...item,
+              status: 'pending',
+              retryCount: (item.retryCount || 0) + 1,
+              error,
+            }
+          : item,
+      ),
+    )
+  }
 }

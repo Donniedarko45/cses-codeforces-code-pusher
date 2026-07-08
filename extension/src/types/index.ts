@@ -25,6 +25,7 @@ export interface SyncItem {
   readmeContent?: string
   status: SyncStatus
   error?: string
+  retryCount?: number
 }
 
 export interface ExtensionSettings {

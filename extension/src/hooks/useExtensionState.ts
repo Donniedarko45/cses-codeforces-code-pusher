@@ -16,9 +16,10 @@ const emptyStats: DashboardStats = {
 export const useExtensionState = () => {
   const [stats, setStats] = useState<DashboardStats>(emptyStats)
   const [history, setHistory] = useState<SyncItem[]>([])
+  const [queue, setQueue] = useState<SyncItem[]>([])
 
   const loadState = useCallback(async () => {
-    const [token, clientId, username, repo, queue, historyItems] = await Promise.all([
+    const [token, clientId, username, repo, queueItems, historyItems] = await Promise.all([
       SecureStorage.getToken(),
       SecureStorage.getClientId(),
       SecureStorage.getGithubUsername(),
@@ -28,6 +29,7 @@ export const useExtensionState = () => {
     ])
 
     setHistory(historyItems)
+    setQueue(queueItems)
     setStats({
       githubConnected: Boolean(token),
       githubUsername: username ?? '',
@@ -37,7 +39,7 @@ export const useExtensionState = () => {
       todayUploads: historyItems.filter((item) =>
         item.metadata.submittedAt.startsWith(new Date().toISOString().slice(0, 10)),
       ).length,
-      pendingUploads: queue.length,
+      pendingUploads: queueItems.length,
       latestCommitMessage:
         historyItems[0]?.metadata.problemName
           ? `Solved ${historyItems[0].metadata.platform} ${historyItems[0].metadata.problemName}`
@@ -53,5 +55,5 @@ export const useExtensionState = () => {
     void loadState()
   }, [loadState])
 
-  return { stats, history, refresh }
+  return { stats, history, queue, refresh }
 }

@@ -8,7 +8,7 @@ import { SettingsPanel } from "./SettingsPanel";
 
 export const AppShell = () => {
   const [section, setSection] = useState<SectionKey>("Dashboard");
-  const { stats, history, refresh } = useExtensionState();
+  const { stats, history, queue, refresh } = useExtensionState();
 
   return (
     <main className="app-shell">
@@ -53,6 +53,36 @@ export const AppShell = () => {
               <strong className="truncate">{stats.latestCommitMessage}</strong>
             </Card>
           </div>
+
+          {queue.length > 0 && (
+            <Card title="Sync Queue Details">
+              <ul className="queue-list">
+                {queue.map((item) => (
+                  <li key={item.metadata.submissionId} className="queue-item">
+                    <div className="queue-item-header">
+                      <span className="queue-bullet">⏳</span>
+                      <strong style={{ minWidth: '80px', color: 'var(--text-muted)' }}>
+                        {item.metadata.platform}
+                      </strong>
+                      <span className="truncate" style={{ flex: 1, marginRight: '8px' }}>
+                        {item.metadata.problemName}
+                      </span>
+                      {item.retryCount !== undefined && item.retryCount > 0 && (
+                        <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                          (Attempt {item.retryCount + 1}/4)
+                        </span>
+                      )}
+                    </div>
+                    {item.status === "failed" && item.error && (
+                      <div className="queue-error">
+                        {item.error}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </div>
       )}
 

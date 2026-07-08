@@ -86,5 +86,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "FETCH_URL") {
+    const { url } = message.payload as { url: string };
+    void fetch(url)
+      .then((resp) => resp.text())
+      .then((text) => sendResponse({ text }))
+      .catch((err) => sendResponse({ error: err.message || String(err) }));
+    return true;
+  }
+
   return false;
 });
