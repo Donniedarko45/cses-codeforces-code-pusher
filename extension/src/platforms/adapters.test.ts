@@ -13,10 +13,25 @@ describe('platform acceptance detection', () => {
     ).toBe(true)
   })
 
-  it('detects cses accepted submissions', () => {
+  it('detects cses accepted submissions on result pages', () => {
+    expect(
+      isCsesAccepted(
+        'https://cses.fi/problemset/result/17860155/',
+        '<span class="accepted">ACCEPTED</span>',
+      ),
+    ).toBe(true)
+  })
+
+  it('detects cses accepted submissions on submission pages', () => {
     expect(
       isCsesAccepted('https://cses.fi/problemset/submission/111', 'Your submission was accepted'),
     ).toBe(true)
+  })
+
+  it('rejects non-accepted cses pages', () => {
+    expect(
+      isCsesAccepted('https://cses.fi/problemset/result/111', 'WRONG ANSWER'),
+    ).toBe(false)
   })
 
   it('sanitizes filenames for repository-safe paths', () => {

@@ -17,10 +17,6 @@ export default defineManifest({
     "https://api.github.com/*",
     "https://github.com/*",
   ],
-  oauth2: {
-    client_id: "REPLACE_WITH_GITHUB_OAUTH_APP_CLIENT_ID",
-    scopes: ["repo", "read:user"],
-  },
   background: {
     service_worker: "src/background/background.ts",
     type: "module",
