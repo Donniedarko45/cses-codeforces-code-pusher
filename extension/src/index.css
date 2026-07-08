@@ -1,0 +1,101 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: #0b0f17;
+  color: #d9e0ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  width: 420px;
+  min-height: 580px;
+  background: linear-gradient(180deg, #0e1320, #0a0f19);
+}
+
+.app-shell {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+p {
+  margin: 0;
+  color: #96a2b8;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tab {
+  border: 1px solid #232d41;
+  color: #b8c4db;
+  background: #101726;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.tab.active {
+  border-color: #6ca0ff;
+  background: #172744;
+  color: #eaf1ff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.card {
+  border: 1px solid #24324d;
+  border-radius: 12px;
+  background: #111a2c;
+  padding: 10px;
+}
+
+.card h3 {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  color: #9db0d4;
+}
+
+.card strong {
+  font-size: 0.9rem;
+}
+
+.history {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+footer button {
+  width: 100%;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
