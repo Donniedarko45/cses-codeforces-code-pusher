@@ -136,6 +136,101 @@ export class GitHubRepoService {
     return (await resp.json()) as GitHubRepo
   }
 
+  async commitFiles(
+    files: Array<{ path: string; content: string }>,
+    commitMessage: string,
+    retryCount = 0,
+  ): Promise<void> {
+    try {
+      // 1. Get latest commit SHA of the branch
+      const refResponse = await fetch(
+        `${GITHUB_API}/repos/${this.repository.owner}/${this.repository.repo}/git/ref/heads/${this.repository.branch}`,
+        { headers: this.headers() },
+      )
+      if (!refResponse.ok) {
+        throw new Error(`Failed to get ref: ${refResponse.status}`)
+      }
+      const refData = await refResponse.json()
+      const parentSha = refData.object.sha
+
+      // 2. Get the commit info to retrieve its tree SHA
+      const commitResponse = await fetch(
+        `${GITHUB_API}/repos/${this.repository.owner}/${this.repository.repo}/git/commits/${parentSha}`,
+        { headers: this.headers() },
+      )
+      if (!commitResponse.ok) {
+        throw new Error(`Failed to get commit info: ${commitResponse.status}`)
+      }
+      const commitData = await commitResponse.json()
+      const baseTreeSha = commitData.tree.sha
+
+      // 3. Create a new tree on top of the base tree
+      const treeResponse = await fetch(
+        `${GITHUB_API}/repos/${this.repository.owner}/${this.repository.repo}/git/trees`,
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({
+            base_tree: baseTreeSha,
+            tree: files.map((file) => ({
+              path: file.path,
+              mode: '100644',
+              type: 'blob',
+              content: file.content,
+            })),
+          }),
+        },
+      )
+      if (!treeResponse.ok) {
+        throw new Error(`Failed to create tree: ${treeResponse.status}`)
+      }
+      const treeData = await treeResponse.json()
+      const newTreeSha = treeData.sha
+
+      // 4. Create the commit object
+      const newCommitResponse = await fetch(
+        `${GITHUB_API}/repos/${this.repository.owner}/${this.repository.repo}/git/commits`,
+        {
+          method: 'POST',
+          headers: this.headers(),
+          body: JSON.stringify({
+            message: commitMessage,
+            tree: newTreeSha,
+            parents: [parentSha],
+          }),
+        },
+      )
+      if (!newCommitResponse.ok) {
+        throw new Error(`Failed to create commit: ${newCommitResponse.status}`)
+      }
+      const newCommitData = await newCommitResponse.json()
+      const newCommitSha = newCommitData.sha
+
+      // 5. Update the branch reference to point to the new commit
+      const updateRefResponse = await fetch(
+        `${GITHUB_API}/repos/${this.repository.owner}/${this.repository.repo}/git/refs/heads/${this.repository.branch}`,
+        {
+          method: 'PATCH',
+          headers: this.headers(),
+          body: JSON.stringify({
+            sha: newCommitSha,
+            force: false,
+          }),
+        },
+      )
+      if (!updateRefResponse.ok) {
+        throw new Error(`Failed to update ref: ${updateRefResponse.status}`)
+      }
+    } catch (error) {
+      if (retryCount < 3) {
+        // Wait and retry
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        return this.commitFiles(files, commitMessage, retryCount + 1)
+      }
+      throw error
+    }
+  }
+
   static buildCommitMessage(metadata: SubmissionMetadata): string {
     return `Solved ${metadata.platform} ${metadata.problemId}`
   }

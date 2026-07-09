@@ -46,6 +46,7 @@ export interface RepositoryConfig {
 export interface DashboardStats {
   githubConnected: boolean
   githubUsername: string
+  avatarUrl?: string
   clientIdConfigured: boolean
   repository: string
   syncedCount: number

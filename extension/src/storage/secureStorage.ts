@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   token: 'github_token',
   clientId: 'github_client_id',
   githubUsername: 'github_username',
+  githubAvatarUrl: 'github_avatar_url',
   settings: 'settings',
   repository: 'repository',
   syncHistory: 'sync_history',
@@ -64,6 +65,20 @@ export class SecureStorage {
 
   static async clearGithubUsername(): Promise<void> {
     await chrome.storage.local.remove(STORAGE_KEYS.githubUsername)
+  }
+
+  // --- GitHub Avatar URL ---
+  static async setGithubAvatarUrl(avatarUrl: string): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.githubAvatarUrl]: avatarUrl })
+  }
+
+  static async getGithubAvatarUrl(): Promise<string | null> {
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.githubAvatarUrl)
+    return (stored[STORAGE_KEYS.githubAvatarUrl] as string | undefined) ?? null
+  }
+
+  static async clearGithubAvatarUrl(): Promise<void> {
+    await chrome.storage.local.remove(STORAGE_KEYS.githubAvatarUrl)
   }
 
   // --- Repository ---

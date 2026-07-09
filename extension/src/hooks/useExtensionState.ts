@@ -5,6 +5,7 @@ import { SecureStorage } from '../storage/secureStorage'
 const emptyStats: DashboardStats = {
   githubConnected: false,
   githubUsername: '',
+  avatarUrl: '',
   clientIdConfigured: false,
   repository: 'Not selected',
   syncedCount: 0,
@@ -19,10 +20,11 @@ export const useExtensionState = () => {
   const [queue, setQueue] = useState<SyncItem[]>([])
 
   const loadState = useCallback(async () => {
-    const [token, clientId, username, repo, queueItems, historyItems] = await Promise.all([
+    const [token, clientId, username, avatarUrl, repo, queueItems, historyItems] = await Promise.all([
       SecureStorage.getToken(),
       SecureStorage.getClientId(),
       SecureStorage.getGithubUsername(),
+      SecureStorage.getGithubAvatarUrl(),
       SecureStorage.getRepository(),
       SecureStorage.getSyncQueue(),
       SecureStorage.getSyncHistory(),
@@ -33,6 +35,7 @@ export const useExtensionState = () => {
     setStats({
       githubConnected: Boolean(token),
       githubUsername: username ?? '',
+      avatarUrl: avatarUrl ?? '',
       clientIdConfigured: Boolean(clientId),
       repository: repo ? `${repo.owner}/${repo.repo}` : 'Not selected',
       syncedCount: historyItems.filter((item) => item.status === 'uploaded').length,

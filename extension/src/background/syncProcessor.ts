@@ -91,17 +91,29 @@ export const processPendingSync = async (): Promise<void> => {
   for (const item of itemsToProcess) {
     const path = `${item.metadata.folderPath}/${item.metadata.filename}`
     try {
+      const currentHistory = await SecureStorage.getSyncHistory()
+      const updatedHistory: SyncItem[] = [{ ...item, status: 'uploaded' as const }, ...currentHistory].slice(0, 500)
+
+      const files = [
+        {
+          path,
+          content: item.sourceCode,
+        },
+        {
+          path: 'README.md',
+          content: makeReadme(updatedHistory),
+        },
+      ]
+
       if (item.readmeContent) {
-        await github.upsertFile(
-          `${item.metadata.folderPath}/README.md`,
-          item.readmeContent,
-          `Add problem statement for ${item.metadata.problemName}`,
-        )
+        files.push({
+          path: `${item.metadata.folderPath}/README.md`,
+          content: item.readmeContent,
+        })
       }
 
-      await github.upsertFile(
-        path,
-        item.sourceCode,
+      await github.commitFiles(
+        files,
         GitHubRepoService.buildCommitMessage(item.metadata),
       )
       await SyncQueueService.markUploaded(item.metadata.submissionId)
@@ -115,7 +127,4 @@ export const processPendingSync = async (): Promise<void> => {
       }
     }
   }
-
-  const history = await SecureStorage.getSyncHistory()
-  await github.upsertFile('README.md', makeReadme(history), 'Updated README statistics')
 }
